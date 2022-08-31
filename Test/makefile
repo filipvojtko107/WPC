@@ -1,14 +1,21 @@
+COMPILER = g++
+FLAGS = -std=c++17 -Wall
+INCLUDE_PATH = ../
+CPP_FILES = $(INCLUDE_PATH)*.cpp main.cpp
+LIBS = -lwthttp -lwt
+TARGET = app
 
-test: main.cpp
-	g++ -I../ -std=c++17 -Wall main.cpp -o test -lwthttp -lwt
+
+$(TARGET): $(CPP_FILES)
+	$(COMPILER) -I$(INCLUDE_PATH) $(FLAGS) $(CPP_FILES) -o $(TARGET) $(LIBS)
 	
 
-all: test
+all: $(TARGET)
 
 
 run:
-	./test --docroot . --http-address 0.0.0.0 --http-port 9090
+	./$(TARGET) --docroot . --http-address 127.0.0.1 --http-port 8080
 	
 
 clean:
-	rm -f test
+	rm -f $(TARGET)

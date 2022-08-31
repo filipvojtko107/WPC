@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <vector>
 #include <exception>
 
 #include <Wt/WApplication.h>
@@ -19,23 +20,23 @@
 class HomePage : public WebPage
 {
 	public:
-		HomePage(const std::string& internalPath)
-			: WebPage(internalPath)
+		HomePage(const std::string& internalPath) :
+			WebPage(internalPath)
 		{
 
 		}
 
-		virtual ~HomePage() = default;
+		~HomePage() = default;
+		
 
-
-		void render(Wt::WContainerWidget& content) override
+		void render() override
 		{
-			content.addNew<Wt::WText>("<br>Home page</br>");
+			this->addNew<Wt::WText>("<br>Home page</br>");
 
-			page1 = content.addNew<Wt::WPushButton>("Page 1");
+			page1 = this->addNew<Wt::WPushButton>("Page 1");
 			page1->setLink(Wt::WLink(Wt::LinkType::InternalPath, "/page1"));
 
-			page2 = content.addNew<Wt::WPushButton>("Page 2");
+			page2 = this->addNew<Wt::WPushButton>("Page 2");
 			page2->setLink(Wt::WLink(Wt::LinkType::InternalPath, "/page2"));
 		}
 		
@@ -49,23 +50,23 @@ class HomePage : public WebPage
 class Page1 : public WebPage
 {
 	public:
-		Page1(const std::string& internalPath)
-			: WebPage(internalPath)
+		Page1(const std::string& internalPath) :
+			WebPage(internalPath)
 		{
 			
 		}
 
-		virtual ~Page1() = default;
+		~Page1() = default;
 
 
-		void render(Wt::WContainerWidget& content) override
+		void render() override
 		{
-			content.addNew<Wt::WText>("<br>Page 1</br>");
+			this->addNew<Wt::WText>("<br>Page 1</br>");
 
-			back = content.addNew<Wt::WPushButton>("Home page");
+			back = this->addNew<Wt::WPushButton>("Home page");
 			back->setLink(Wt::WLink(Wt::LinkType::InternalPath, "/"));
 
-			page2 = content.addNew<Wt::WPushButton>("Page 2");
+			page2 = this->addNew<Wt::WPushButton>("Page 2");
 			page2->setLink(Wt::WLink(Wt::LinkType::InternalPath, "/page2"));
 		}
 		
@@ -80,23 +81,23 @@ class Page1 : public WebPage
 class Page2 : public WebPage
 {
 	public:
-		Page2(const std::string& internalPath)
-			: WebPage(internalPath)
+		Page2(const std::string& internalPath) :
+			WebPage(internalPath)
 		{
 			
 		}
 
-		virtual ~Page2() = default;
+		~Page2() = default;
 
 
-		void render(Wt::WContainerWidget& content) override
+		void render() override
 		{
-			content.addNew<Wt::WText>("<br>Page 2</br>");
+			this->addNew<Wt::WText>("<br>Page 2</br>");
 
-			back = content.addNew<Wt::WPushButton>("Home page");
+			back = this->addNew<Wt::WPushButton>("Home page");
 			back->setLink(Wt::WLink(Wt::LinkType::InternalPath, "/"));
 
-			page1 = content.addNew<Wt::WPushButton>("Page 1");
+			page1 = this->addNew<Wt::WPushButton>("Page 1");
 			page1->setLink(Wt::WLink(Wt::LinkType::InternalPath, "/page1"));
 		}
 
@@ -114,54 +115,63 @@ class App : public Wt::WApplication
         App(const Wt::WEnvironment& env);
         virtual ~App() = default;
 
+		static App* instance();
+		WebPageContainer* wpc();
+		const WebPageContainer* wpc() const;
+
 
     private:
         void render();
         void run();
-
-
+        
+        
     private:
-    	std::unique_ptr<WebPageContainer> cont;
+    	WebPageContainer wpc_;
 };
 
 
 
-App::App(const Wt::WEnvironment& env)
-    : Wt::WApplication(env)
+App::App(const Wt::WEnvironment& env) :
+	Wt::WApplication(env)
 {
     this->render();
     this->run();
 }
 
 
+App* App::instance() {
+	return dynamic_cast<App*>(Wt::WApplication::instance());
+}
+
+
+WebPageContainer* App::wpc() {
+	return &wpc_;
+}
+
+
+const WebPageContainer* App::wpc() const {
+	return &wpc_;
+}
+
+
 void App::render()
 {
-	cont = std::make_unique<WebPageContainer>(root());
+	wpc_.setRenderContainer(root());
 
-	cont->addPage<HomePage>("/");
-	cont->addPage<Page1>("/page1");
-	cont->addPage<Page2>("/page2");
+	wpc_.addPage(std::make_unique<HomePage>("/"));
+	wpc_.addPage(std::make_unique<Page1>("/page1"));
+	wpc_.addPage(std::make_unique<Page2>("/page2"));
+	
+	wpc_.redirect(this->internalPath());
 }
 
 
 
 void App::run()
 {
-	cont->renderPage("/");
-
-	this->internalPathChanged().connect([this](void)
+	this->internalPathChanged().connect([this]()
 	{
-		std::vector<std::unique_ptr<WebPage>>* pages = cont->getPages();
-
-		for (std::unique_ptr<WebPage>& page : *pages)
-		{
-			if (page->getInternalPath() == this->internalPath())
-			{
-				cont->clearPage(); 
-				cont->renderPage(*page);
-				break;
-			}
-		}
+		wpc_.redirect(this->internalPath());
 	});
 }
 

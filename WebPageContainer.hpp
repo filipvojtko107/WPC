@@ -2,228 +2,155 @@
 #define WEB_PAGE_CONTAINER_HPP
 
 #include "WebPage.hpp"
-
 #include <cinttypes>
 #include <vector>
-
-#include <Wt/WApplication.h>
+#include <iterator>
 
 
 
 class WebPageContainer
 {
     public:
+        enum class ErrorType
+        {
+            NO_RENDER_CONTAINER,
+            NO_PAGE,
+            PAGE_EXISTS,
+            OK
+        };
+
         WebPageContainer() = default;
-        WebPageContainer(std::unique_ptr<Wt::WContainerWidget> content);
-        WebPageContainer(Wt::WContainerWidget* content);
+        WebPageContainer(Wt::WContainerWidget* container);
         WebPageContainer(const WebPageContainer& obj) = delete;
-        WebPageContainer(WebPageContainer&& obj) = delete;
+        WebPageContainer(WebPageContainer&& obj);
         virtual ~WebPageContainer() = default;
-
+        
         WebPageContainer& operator=(const WebPageContainer& obj) = delete;
-        WebPageContainer& operator=(WebPageContainer&& obj) = delete;
-
-        static WebPageContainer* instance();
-
-        Wt::WContainerWidget* getContent() const;
-        void setContent(std::unique_ptr<Wt::WContainerWidget> content);
-        void setContent(Wt::WContainerWidget* content);
-        bool isContent() const;
-        bool isContentPtr() const;
+        WebPageContainer& operator=(WebPageContainer&& obj);
 
         void reset();
-        template<typename PageType> PageType* addPage(const std::string& internalPath);
-        void removePage(const WebPage& page);
-        void renderPage(WebPage& page);
-        void renderPage(const std::string& internalPath);
-        void clearPage();
+        ErrorType addPage(std::unique_ptr<WebPage> page);
+        ErrorType removePage(const WebPage* page);
+        ErrorType removePage(const std::string& internalPath);
+        
+        ErrorType redirect(WebPage* page);
+        ErrorType redirect(const std::string& internalPath);
+        
+        Wt::WContainerWidget* renderContainer();
+        const Wt::WContainerWidget* renderContainer() const;
+        void setRenderContainer(Wt::WContainerWidget* container);
         WebPage* getPage(const std::string& internalPath);
-        template<typename PageType> PageType* getPage(const std::string& internalPath);
-        std::vector<std::unique_ptr<WebPage>>* getPages();
-        bool isPage(const WebPage& page, std::size_t* position = nullptr) const;
+        const WebPage* getPage(const std::string& internalPath) const;
+        const std::vector<std::unique_ptr<WebPage>>& getPages() const;
+        WebPage* renderedPage();
+        const WebPage* renderedPage() const;
+        
         std::size_t pageCount() const;
+        bool isRenderContainer() const;
+        bool isRenderedPage() const;
+        bool isPage(const WebPage* page) const;
+    	bool isPage(const std::string& internalPath) const;
+
+        static const char* getErrorMessage(const ErrorType& error);
 
 
     private:
-        static WebPageContainer* thisInstance;
-        std::vector<std::unique_ptr<WebPage>> pages;
-        std::unique_ptr<Wt::WContainerWidget> content;
-        Wt::WContainerWidget* contentPtr = nullptr;
+        void log(const ErrorType& error);
+        std::vector<std::unique_ptr<WebPage>>::iterator findPage(const std::string& internalPath);
+        std::vector<std::unique_ptr<WebPage>>::const_iterator findPage(const std::string& internalPath) const;
+
+        std::vector<std::unique_ptr<WebPage>> pages_;
+        Wt::WContainerWidget* renderContainer_ = nullptr;
+        WebPage* renderedPage_ = nullptr;
+        std::size_t renderedPageIndex_ = 0;
+
+        static const std::string WPC_LOG_ERROR;
+        static const std::string WPC_LOG_INFO;
 };
 
 
-WebPageContainer* WebPageContainer::thisInstance = nullptr;
-
-
-WebPageContainer::WebPageContainer(std::unique_ptr<Wt::WContainerWidget> content)
+inline WebPageContainer::ErrorType WebPageContainer::removePage(const WebPage* page)
 {
-    this->content = std::move(content);
-    thisInstance = this;
+    return removePage(page->internalPath());
 }
 
 
-WebPageContainer::WebPageContainer(Wt::WContainerWidget* content)
+inline WebPageContainer::ErrorType WebPageContainer::redirect(WebPage* page)
 {
-    contentPtr = content;
-    thisInstance = this;
+    return redirect(page->internalPath());
 }
 
 
-WebPageContainer* WebPageContainer::instance()
+inline Wt::WContainerWidget* WebPageContainer::renderContainer()
 {
-    return thisInstance;
+    return renderContainer_;
 }
 
 
-void WebPageContainer::reset()
+inline const Wt::WContainerWidget* WebPageContainer::renderContainer() const
 {
-    pages.clear();
-    content.reset();
-    contentPtr = nullptr;
+    return renderContainer_;
 }
 
 
-Wt::WContainerWidget* WebPageContainer::getContent() const
+inline void WebPageContainer::setRenderContainer(Wt::WContainerWidget* container)
 {
-    if (contentPtr != nullptr) { return contentPtr; }
-    else if (content.get() != nullptr) { return content.get(); }
-    return nullptr;
+    renderContainer_ = container;
 }
 
 
-void WebPageContainer::setContent(std::unique_ptr<Wt::WContainerWidget> content)
+inline WebPage* WebPageContainer::getPage(const std::string& internalPath)
 {
-    this->content = std::move(content);
+    return (*findPage(internalPath)).get();
 }
 
 
-void WebPageContainer::setContent(Wt::WContainerWidget* content)
+inline const WebPage* WebPageContainer::getPage(const std::string& internalPath) const
 {
-    contentPtr = content;
+    return (*findPage(internalPath)).get();
 }
 
 
-bool WebPageContainer::isContent() const
+inline const std::vector<std::unique_ptr<WebPage>>& WebPageContainer::getPages() const
 {
-    return (content.get() != nullptr);
+	return pages_;
 }
 
 
-bool WebPageContainer::isContentPtr() const
+inline WebPage* WebPageContainer::renderedPage()
 {
-    return (contentPtr != nullptr);
+    return renderedPage_;
 }
 
 
-void WebPageContainer::renderPage(WebPage& page)
+inline const WebPage* WebPageContainer::renderedPage() const
 {
-    if (isPage(page) == true)
-    {
-        if (contentPtr != nullptr) { page.render(*contentPtr); }
-        else if (content.get() != nullptr) { page.render(*content); }
-        return;
-    }
+    return renderedPage_;
 }
 
 
-void WebPageContainer::renderPage(const std::string& internalPath)
+inline std::size_t WebPageContainer::pageCount() const
 {
-    for (std::unique_ptr<WebPage>& singlePage : pages)
-    {
-        if (singlePage->getInternalPath() == internalPath)
-        {
-            if (contentPtr != nullptr) { singlePage->render(*contentPtr); }
-            else if (content.get() != nullptr) { singlePage->render(*content); }
-            return;
-        }
-    }
+    return pages_.size();
 }
 
 
-void WebPageContainer::clearPage()
+inline bool WebPageContainer::isRenderContainer() const
 {
-    if (contentPtr != nullptr) { contentPtr->clear(); }
-    else if (content.get() != nullptr) { content->clear(); }
+    return static_cast<bool>(renderContainer_);
 }
 
 
-template<typename PageType>
-PageType* WebPageContainer::addPage(const std::string& internalPath)
+inline bool WebPageContainer::isRenderedPage() const
 {
-    pages.push_back(std::make_unique<PageType>(internalPath));
-    return dynamic_cast<PageType*>(pages.at(pages.size() - 1).get());
+    return static_cast<bool>(renderedPage_);
 }
 
 
-void WebPageContainer::removePage(const WebPage& page)
+inline bool WebPageContainer::isPage(const WebPage* page) const
 {
-    std::size_t position = 0;
-    if (isPage(page, &position) == true)
-    {
-        pages.erase(pages.begin() + position);
-    }
+    return isPage(page->internalPath()); 
 }
-
-
-WebPage* WebPageContainer::getPage(const std::string& internalPath)
-{
-    for (std::unique_ptr<WebPage>& singlePage : pages)
-    {
-        if (singlePage->getInternalPath() == internalPath) { return singlePage.get(); }
-    }
-
-    return nullptr;
-}
-
-
-template<typename PageType>
-PageType* WebPageContainer::getPage(const std::string& internalPath)
-{
-    for (std::unique_ptr<WebPage>& singlePage : pages)
-    {
-        if (singlePage->getInternalPath() == internalPath) { return dynamic_cast<PageType*>(singlePage.get()); }
-    }
-
-    return nullptr;
-}
-
-
-std::vector<std::unique_ptr<WebPage>>* WebPageContainer::getPages()
-{
-    return &pages;
-}
-
-
-bool WebPageContainer::isPage(const WebPage& page, std::size_t* position) const
-{
-    if (position != nullptr)
-    {
-        for (const std::unique_ptr<WebPage>& singlePage : pages)
-        {
-            if (singlePage.get() == &page) { return true; }
-            else { *position += 1; }
-        }
-
-        *position = 0;
-    }
-
-    else
-    {
-        for (const std::unique_ptr<WebPage>&singlePage : pages)
-        {
-            if (singlePage.get() == &page) { return true; }
-        }
-    }
-
-    return false;
-}
-
-
-std::size_t WebPageContainer::pageCount() const
-{
-    return pages.size();
-}
-
 
 
 #endif  // WEB_PAGE_CONTAINER_HPP
