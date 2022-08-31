@@ -1,5 +1,4 @@
-# Wt_Extension
-Extension for C++ Web Toolkit (Wt) for creating and managing 
-web pages with rendering content based on one main widget container.
+# WPC
+WPC (Web Page Container) is a extension for C++ Web Toolkit (Wt) for managing and rendering web pages based on internal path.
 
 Requirements: C++ Web Toolkit (Wt), GCC C++17
